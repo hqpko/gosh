@@ -7,11 +7,11 @@ package main
 import "gosh"
 
 func main() {
-  //设置输出（time,pkg,in,out)
-  //gosh.EchoTime=true
-  //gosh.EchoPkg=true
-  //gosh.EchoIn=true
-  //gosh.EchoOut=true
+ 	//设置输出（time,pkg,in,out)
+ 	//gosh.EchoTime=true
+ 	//gosh.EchoPkg=true
+ 	//gosh.EchoIn=true
+ 	//gosh.EchoOut=true
   
 	//简单的运行sh
 	gosh.Run("ls -l")
