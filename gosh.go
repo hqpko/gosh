@@ -1,10 +1,10 @@
 package gosh
 
 var (
-	EchoTime      = false
-	EchoPkg  bool = false
-	EchoIn   bool = false
-	EchoOut  bool = false
+	EchoTime = true
+	EchoPkg  = false
+	EchoIn   = true
+	EchoOut  = true
 )
 
 func NewSession() *Session {
