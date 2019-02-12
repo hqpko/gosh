@@ -5,19 +5,41 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
+)
+
+var (
+	defHandlerIn = func(s *Session, in string) {
+		fmt.Printf("%s < %s\n", time.Now().Format("2006-01-02 15:04:05"), in)
+	}
+
+	defHandlerOut = func(s *Session, out []byte) {
+		bs := bytes.Split(out, []byte{'\n'})
+		for _, b := range bs {
+			fmt.Printf("%s > %s\n", time.Now().Format("2006-01-02 15:04:05"), string(b))
+		}
+	}
+
+	defHandlerErr = func(s *Session, err error) {
+		bs := strings.Split(err.Error(), `\n`)
+		for _, b := range bs {
+			fmt.Printf("%s > %s\n", time.Now().Format("2006-01-02 15:04:05"), string(b))
+		}
+	}
 )
 
 type Session struct {
 	env map[string]string
 	dir string
 
-	echoTime bool
-	echoPkg  bool
-	echoIn   bool
-	echoOut  bool
+	handlerIn  func(s *Session, cmd string)
+	handlerOut func(s *Session, out []byte)
+	handlerErr func(s *Session, err error)
+}
+
+func (s *Session) GetDir() string {
+	return s.dir
 }
 
 func (s *Session) SetDir(dir string) {
@@ -33,59 +55,43 @@ func (s *Session) GetEvn(key string) (string, bool) {
 	return v, ok
 }
 
-func (s *Session) echo(str string) {
-	infos := strings.Split(str, "\n")
-	for _, info := range infos {
-		if info == "" {
-			continue
-		}
-		echo := ""
-		if s.echoTime {
-			echo += time.Now().Format("15:04:05") + " : "
-		}
-		if s.echoPkg {
-			dir := s.dir
-			if dir == "" {
-				dir = os.Args[0]
-				dir, _ = filepath.Abs(dir)
-			}
-			echo += dir + " > "
-		}
-		echo += info
-		fmt.Println(echo)
+func (s *Session) SetHandlerIn(handler func(s *Session, cmd string)) {
+	if handler != nil {
+		s.handlerIn = handler
 	}
 }
 
-func (s *Session) Run(cmds ...string) error {
-	cmd := ""
-	for _, c := range cmds {
-		cmd += c + " "
+func (s *Session) SetHandlerOut(handler func(s *Session, out []byte)) {
+	if handler != nil {
+		s.handlerOut = handler
 	}
-	c := exec.Command("/bin/sh", "-c", cmd)
-	c.Dir = s.dir
-	c.Env = os.Environ()
+}
+
+func (s *Session) SetHandlerErr(handler func(s *Session, err error)) {
+	if handler != nil {
+		s.handlerErr = handler
+	}
+}
+
+func (s *Session) Run(commands ...string) error {
+	cmdStr := strings.Join(commands, " && ")
+	cmd := s.getCmd(cmdStr)
+	s.handlerIn(s, cmdStr)
+	out, err := cmd.Output()
+	if err != nil {
+		s.handlerErr(s, err)
+		return err
+	}
+	s.handlerOut(s, out)
+	return nil
+}
+
+func (s *Session) getCmd(commandStr string) *exec.Cmd {
+	cmd := exec.Command("/bin/sh", "-c", commandStr)
+	cmd.Dir = s.dir
+	cmd.Env = os.Environ()
 	for k, v := range s.env {
-		c.Env = append(c.Env, k+"="+v)
+		cmd.Env = append(cmd.Env, k+"="+v)
 	}
-
-	var out bytes.Buffer
-	var errout bytes.Buffer
-	if s.echoOut {
-		c.Stdout = &out
-		c.Stderr = &errout
-	}
-	if s.echoIn {
-		s.echo(cmd)
-	}
-
-	err := c.Run()
-	if s.echoOut {
-		if out.Len() > 0 {
-			s.echo(out.String())
-		}
-		if errout.Len() > 0 {
-			s.echo(errout.String())
-		}
-	}
-	return err
+	return cmd
 }
