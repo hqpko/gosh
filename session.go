@@ -21,7 +21,7 @@ var (
 		}
 	}
 
-	defHandlerErr = func(s *Session, err error) {
+	defHandlerErr = func(s *Session, err *exec.ExitError) {
 		bs := strings.Split(err.Error(), `\n`)
 		for _, b := range bs {
 			fmt.Printf("%s > %s\n", time.Now().Format("2006-01-02 15:04:05"), string(b))
@@ -35,7 +35,7 @@ type Session struct {
 
 	handlerIn  func(s *Session, cmd string)
 	handlerOut func(s *Session, out []byte)
-	handlerErr func(s *Session, err error)
+	handlerErr func(s *Session, err *exec.ExitError)
 }
 
 func (s *Session) GetDir() string {
@@ -67,7 +67,7 @@ func (s *Session) SetHandlerOut(handler func(s *Session, out []byte)) {
 	}
 }
 
-func (s *Session) SetHandlerErr(handler func(s *Session, err error)) {
+func (s *Session) SetHandlerErr(handler func(s *Session, err *exec.ExitError)) {
 	if handler != nil {
 		s.handlerErr = handler
 	}
@@ -79,7 +79,9 @@ func (s *Session) Run(commands ...string) error {
 	s.handlerIn(s, cmdStr)
 	out, err := cmd.Output()
 	if err != nil {
-		s.handlerErr(s, err)
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			s.handlerErr(s, exitErr)
+		}
 		return err
 	}
 	s.handlerOut(s, out)
